@@ -1,0 +1,242 @@
+# ============================================================
+# AIGC Architect — 산업별 유의적 계정 프로필
+# ------------------------------------------------------------
+# 이 파일은 도구의 "분기 로직"이다.
+# 산업을 선택하면 어떤 회계 프로세스가 AI 통제 설계 대상이 되는지,
+# 그 판단의 근거가 무엇인지를 인코딩한다.
+#
+# 유의성 판단은 회계사의 전문가적 판단이며, 코드가 아닌 지식이다.
+# ============================================================
+
+meta:
+  version: "0.1"
+  last_updated: "2026-07-09"
+  note: "significance 등급은 일반적 경우를 전제. 개별 기업의 유의성은 사업 특성에 따라 달라질 수 있으므로 도구에서 수정 가능하게 노출한다"
+
+significance_levels:
+  critical:
+    label: "유의적 추정 (★)"
+    description: "회계추정이 개입하며 감사기준서 540의 대상. AI 개입 시 블랙박스화 위험 최대"
+    priority: 1
+  significant:
+    label: "유의적 계정"
+    description: "금액적·질적으로 유의적이나 추정의 불확실성은 상대적으로 낮음"
+    priority: 2
+  routine:
+    label: "일상적 처리"
+    description: "거래량은 많으나 판단 요소가 적음. 자동화 효익은 크나 통제 난도는 낮음"
+    priority: 3
+  low:
+    label: "비유의적"
+    description: "계정은 존재하나 금액적·질적 유의성 및 AI 개입 유인이 낮음"
+    priority: 90
+  not_applicable:
+    label: "해당 없음"
+    description: "해당 산업에 계정 자체가 존재하지 않음"
+    priority: 99
+
+processes:
+  ecl_estimation:
+    name: "대손충당금·기대신용손실(ECL) 추정"
+    standard: "K-IFRS 1109"
+    assertions: ["평가", "배분"]
+    ai_intervention: "PD·LGD 모델링, 미래전망정보 반영"
+  fair_value:
+    name: "금융상품 공정가치 평가"
+    standard: "K-IFRS 1113"
+    assertions: ["평가"]
+    ai_intervention: "레벨2·3 관측불가능 투입변수 산출"
+  inventory_obsolescence:
+    name: "재고 진부화·순실현가치 평가"
+    standard: "K-IFRS 1002"
+    assertions: ["평가"]
+    ai_intervention: "판매 예측 모델 기반 진부화 판단"
+  lease_recognition:
+    name: "리스 인식 (리스부채·사용권자산)"
+    standard: "K-IFRS 1116"
+    assertions: ["발생사실", "평가", "완전성"]
+    ai_intervention: "계약서 자동 판독, 리스기간·옵션 판단"
+  revenue_recognition:
+    name: "수익인식 (수행의무 식별·거래가격 배분)"
+    standard: "K-IFRS 1115"
+    assertions: ["발생사실", "완전성", "기간귀속"]
+    ai_intervention: "계약서 자동 판독, 수행의무 식별"
+  poc_estimation:
+    name: "진행률 추정 (총원가 추정)"
+    standard: "K-IFRS 1115"
+    assertions: ["평가", "기간귀속"]
+    ai_intervention: "총예정원가 예측 모델"
+  cost_allocation:
+    name: "원가 배부"
+    standard: "K-IFRS 1002"
+    assertions: ["평가", "분류"]
+    ai_intervention: "배부기준 자동 산정"
+  return_estimation:
+    name: "반품·환불 추정 (변동대가)"
+    standard: "K-IFRS 1115"
+    assertions: ["평가"]
+    ai_intervention: "반품률 예측 모델"
+  asset_impairment:
+    name: "유형자산 손상"
+    standard: "K-IFRS 1036"
+    assertions: ["평가"]
+    ai_intervention: "사용가치 추정 현금흐름 예측"
+  journal_entry:
+    name: "전표 자동 생성·계정 분류"
+    standard: "-"
+    assertions: ["분류", "정확성", "완전성"]
+    ai_intervention: "거래 유형 판정, 계정과목 자동 분류"
+  evidence_ocr:
+    name: "증빙 OCR·데이터 입력"
+    standard: "-"
+    assertions: ["정확성", "발생사실"]
+    ai_intervention: "비정형 증빙 판독"
+  disclosure_draft:
+    name: "주석·공시 초안 생성"
+    standard: "-"
+    assertions: ["표시와 공시", "완전성"]
+    ai_intervention: "생성형 AI 문안 작성"
+  ai_performed_control:
+    name: "AI가 통제 자체를 수행 (대사·예외탐지)"
+    standard: "내부회계관리제도"
+    assertions: ["전 어서션 (간접)"]
+    ai_intervention: "통제 활동의 AI 대체"
+    universal: true
+
+industries:
+
+  financial:
+    name: "금융 · 핀테크"
+    description: "은행, 여신전문금융, 핀테크 대출·중개 플랫폼"
+    profile:
+      ecl_estimation:
+        significance: critical
+        rationale: "미래전망정보를 반영한 추정(1109). 모델 의존도가 높아 AI 개입 유인이 크고, 블랙박스화 시 경영진 검토통제가 형해화됨"
+      fair_value:
+        significance: critical
+        rationale: "레벨2·3 자산의 관측불가능 투입변수를 AI가 생성할 경우 검증 불가"
+      revenue_recognition:
+        significance: significant
+        rationale: "이자수익·수수료수익. 유효이자율 산정에 판단 개입"
+      journal_entry:
+        significance: routine
+        rationale: "거래량이 압도적이라 자동화 효익 큼. 단 판단 요소는 적음"
+      disclosure_draft:
+        significance: routine
+        rationale: "정형화된 문안 비중이 높음"
+      ai_performed_control:
+        significance: critical
+        rationale: "산업 무관. AI가 통제를 수행하는 순간 비결정성으로 운영유효성 테스트 논리 붕괴"
+      inventory_obsolescence:
+        significance: not_applicable
+        rationale: "판매 목적 자산을 보유하지 않음 — 계정 자체가 부존재"
+      lease_recognition:
+        significance: low
+        rationale: "지점 임차·전산장비 사용권자산은 존재하나 금액적·질적 유의성 낮고 AI 개입 유인도 낮음. 단, 여신전문금융회사가 리스를 '제공'하는 경우는 수익 측면에서 별도 검토 필요"
+
+  manufacturing:
+    name: "제조"
+    description: "일반 제조업"
+    profile:
+      inventory_obsolescence:
+        significance: critical
+        rationale: "판매 예측 모델 편향이 평가손실 과소계상으로 직결"
+      lease_recognition:
+        significance: critical
+        rationale: "설비 리스가 금액적으로 유의적. 연장·해지 옵션 판단이 부채 규모를 결정"
+      asset_impairment:
+        significance: significant
+        rationale: "사용가치 추정 시 미래현금흐름 예측에 AI 개입 가능"
+      cost_allocation:
+        significance: significant
+        rationale: "배부기준 자동화 시 원가·재고 평가에 파급"
+      revenue_recognition:
+        significance: significant
+        rationale: "출하·인도 시점 판단"
+      journal_entry:
+        significance: routine
+        rationale: "-"
+      disclosure_draft:
+        significance: routine
+        rationale: "-"
+      ai_performed_control:
+        significance: critical
+        rationale: "산업 무관 공통"
+      ecl_estimation:
+        significance: low
+        rationale: "매출채권 대손은 존재하나 금융업 대비 상대적 비유의적"
+
+  saas_platform:
+    name: "SaaS · 플랫폼"
+    description: "구독형 소프트웨어, 온라인 플랫폼"
+    profile:
+      revenue_recognition:
+        significance: critical
+        rationale: "다요소 계약의 수행의무 식별·거래가격 배분은 판단 영역(1115). 계약서 자동판독 AI의 오독이 직접 어서션 위협"
+      journal_entry:
+        significance: routine
+        rationale: "-"
+      disclosure_draft:
+        significance: routine
+        rationale: "-"
+      ai_performed_control:
+        significance: critical
+        rationale: "산업 무관 공통"
+      inventory_obsolescence:
+        significance: not_applicable
+        rationale: "재고자산 부존재"
+      ecl_estimation:
+        significance: low
+        rationale: "구독료 미수금 대손 — 비유의적"
+
+  construction:
+    name: "건설 · 수주"
+    description: "건설, 조선, 수주형 산업"
+    profile:
+      poc_estimation:
+        significance: critical
+        rationale: "총예정원가 추정이 진행률·수익을 결정. 추정 변경이 손익에 직접 반영되며 공사손실충당부채와 연동"
+      revenue_recognition:
+        significance: critical
+        rationale: "진행기준 수익인식은 추정에 전면 의존"
+      journal_entry:
+        significance: routine
+        rationale: "-"
+      disclosure_draft:
+        significance: routine
+        rationale: "-"
+      ai_performed_control:
+        significance: critical
+        rationale: "산업 무관 공통"
+      inventory_obsolescence:
+        significance: low
+        rationale: "미완성공사 — 진부화 개념 적용 제한적"
+
+  retail:
+    name: "유통 · 리테일"
+    description: "오프라인·온라인 소매"
+    profile:
+      inventory_obsolescence:
+        significance: critical
+        rationale: "재고 회전과 진부화가 핵심. 시즌성·트렌드 예측 모델 의존도 높음"
+      lease_recognition:
+        significance: critical
+        rationale: "점포 임차료가 금액적으로 유의적. 연장옵션 판단이 부채 규모 결정"
+      return_estimation:
+        significance: significant
+        rationale: "반품률 예측 모델이 변동대가 추정에 개입"
+      revenue_recognition:
+        significance: significant
+        rationale: "총액·순액 판단, 반품 추정 연계"
+      journal_entry:
+        significance: routine
+        rationale: "-"
+      disclosure_draft:
+        significance: routine
+        rationale: "-"
+      ai_performed_control:
+        significance: critical
+        rationale: "산업 무관 공통"
+      ecl_estimation:
+        significance: low
+        rationale: "-"

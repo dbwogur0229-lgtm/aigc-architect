@@ -1,0 +1,7 @@
+streamlit>=1.36
+pydantic>=2.6
+PyYAML>=6.0
+numpy>=1.26
+# 선택: LLM/임베딩 (없으면 룰북 템플릿 + 로컬 TF-IDF 로 자동 대체)
+anthropic>=0.34
+voyageai>=0.2

@@ -1,0 +1,11 @@
+# AIGC Architect — 테마 (삼일회계법인/PwC 브랜드 계열)
+# 포인트: PwC 오렌지 / 베이스: 차분한 그레이·네이비
+[theme]
+primaryColor = "#DB4E18"            # PwC 다크 오렌지 — 실행 버튼·포인트
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F5F7" # 입력 위젯·사이드 배경 (차분한 라이트 그레이)
+textColor = "#2E3138"                # 짙은 그레이 텍스트
+font = "sans serif"
+
+[server]
+headless = true

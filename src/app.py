@@ -1,0 +1,451 @@
+"""
+app.py — AIGC Architect Streamlit UI
+------------------------------------------------------------
+화면 흐름: [1] 입력(2단) → [2] 스텝별 실행(Agent 증명) → [3] 탭 출력
+톤앤매너: 삼일회계법인(PwC) 오렌지 포인트 + 차분한 네이비/그레이 베이스.
+통제 스타터킷은 3층 구조(층2 AIGC → 층3 프로세스)를 시각적으로 위계화한다.
+"""
+from __future__ import annotations
+
+import os
+import re
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import streamlit as st
+
+import llm
+import rulebook as rb
+import skills
+from agent import AgentInputs, run_agent
+from rag import RagIndex
+from skills import COMPANY_SIZES, MODEL_SOURCING
+
+st.set_page_config(page_title="AIGC Architect", page_icon="🧭", layout="wide")
+
+# ── PwC 계열 팔레트 ──────────────────────────────────────────
+ORANGE = "#DB4E18"     # PwC 다크 오렌지 (포인트·층2 AIGC)
+ORANGE_LT = "#E88D14"
+NAVY = "#1F2A44"       # 헤더·층3
+SLATE = "#33373D"
+GREY = "#6B7280"
+AMBER = "#B26A00"
+GREEN = "#2E7D32"
+
+# 3층 구조 도식 (입력 화면 좌측 — 처음 보는 사람도 프레임워크를 이해하도록)
+def layer_diagram() -> str:
+    box = ("border-radius:7px;padding:11px 13px;margin:0;"
+           "box-shadow:0 1px 2px rgba(0,0,0,0.05)")
+    arrow = (f"<div style='text-align:center;color:{ORANGE};font-size:0.9rem;"
+             f"line-height:1.1;margin:5px 0'>&#9650;<span style='color:{GREY};"
+             f"font-size:0.72rem;margin-left:5px'>신뢰의 근거</span></div>")
+    return (
+        f"<div style='margin-top:20px'>"
+        f"<div style='font-weight:800;color:{NAVY};font-size:1.0rem;margin-bottom:10px'>"
+        f"🏗️ 통제의 3층 구조</div>"
+        # 층 3
+        f"<div style='border:1px solid #D9DEE5;border-left:7px solid {NAVY};"
+        f"background:#F7F8FA;{box}'>"
+        f"<b style='color:{NAVY}'>층 3 · AI 지원 통제</b>"
+        f"<div style='font-size:0.78rem;color:{GREY};margin-top:2px'>"
+        f"AI가 개입한 회계 프로세스 통제 &rarr; 재무제표 경영진주장을 직접 담보</div></div>"
+        f"{arrow}"
+        # 층 2 (핵심)
+        f"<div style='border:2px solid {ORANGE};border-left:7px solid {ORANGE};"
+        f"background:#FBEEE6;{box}'>"
+        f"<b style='color:{ORANGE}'>층 2 · AIGC &#9733; 본 도구의 핵심</b>"
+        f"<div style='font-size:0.78rem;color:{SLATE};margin-top:2px'>"
+        f"모델&middot;프롬프트&middot;학습데이터 통제 &rarr; AI 고유 리스크(같은 입력에도 결과가 달라짐&middot;판단 근거 불투명&middot;시간이 지나며 성능 변화)</div></div>"
+        f"{arrow}"
+        # 층 1
+        f"<div style='border:1px solid #D9DEE5;border-left:7px solid {GREY};"
+        f"background:#F1F2F4;{box}'>"
+        f"<b style='color:{SLATE}'>층 1 · ITGC (전제 조건 확인)</b>"
+        f"<div style='font-size:0.78rem;color:{GREY};margin-top:2px'>"
+        f"AI가 올라탄 시스템 통제(ERP&middot;원장&middot;AI 파이프라인) &rarr; 갖춰졌는지 여부만 확인(통제 설계는 안 함)</div></div>"
+        f"<div style='font-size:0.79rem;color:{GREY};margin-top:10px;text-align:center;"
+        f"font-style:italic'>&ldquo;층 1 없이 층 2 없고, 층 2 없이 층 3 없다&rdquo;</div>"
+        f"</div>"
+    )
+
+
+# 스캔용 핵심 감사 용어 — 출력 텍스트에서 볼드 처리
+_TERMS = [
+    "감사기준서 540", "감사기준서 330", "KSA 540", "KSA 330",
+    "K-IFRS 1109", "K-IFRS 1115", "K-IFRS 1113", "K-IFRS 1116",
+    "K-IFRS 1008", "K-IFRS 1002", "K-IFRS 1036",
+    "경영진주장", "경영진 검토통제", "Management Bias", "경영진 편의", "MRC",
+    "비결정성", "Non-determinism", "벤치마킹", "benchmarking", "Benchmarking",
+    "IPE", "Human-in-the-loop", "temperature", "할루시네이션",
+    "재수행", "reperformance", "파라미터", "백테스트",
+]
+
+
+@st.cache_resource(show_spinner="RAG 인덱스 구축 중 (룰북+코퍼스 임베딩)...")
+def get_index() -> RagIndex:
+    return RagIndex()
+
+
+def highlight(text: str) -> str:
+    """핵심 감사 용어를 볼드 처리 (긴 용어 우선, 중첩 방지)."""
+    if not text:
+        return text
+    marks: dict[str, str] = {}
+    for i, term in enumerate(sorted(_TERMS, key=len, reverse=True)):
+        if term in text:
+            key = f"\x00{i}\x00"
+            text = text.replace(term, key)
+            marks[key] = term
+    for key, term in marks.items():
+        text = text.replace(key, f"**{term}**")
+    return text
+
+
+def plainify(text: str) -> str:
+    """결과 표시용 용어 정리 — 룰북 원본은 그대로 두고 화면에서만 변환.
+    · '어서션'은 기준서 공식용어 '경영진주장'으로 전량 치환
+    · AI 용어는 '첫 등장'에만 괄호 풀이를 붙여(중복 방지) 비전공자도 이해하게 함."""
+    if not text:
+        return text
+    text = text.replace("어서션", "경영진주장")
+    glosses = [
+        ("비결정적(non-deterministic)", "비결정적(같은 입력에도 결과가 달라질 수 있음)"),
+        ("비결정성", "비결정성(같은 입력에도 결과가 달라질 수 있음)"),
+        ("드리프트", "드리프트(시간이 지나며 성능·판단이 변함)"),
+        ("게이팅", "충족 여부만 확인"),
+        ("할루시네이션", "할루시네이션(없는 사실을 지어내는 현상)"),
+    ]
+    for term, gloss in glosses:
+        idx = text.find(term)
+        if idx != -1:  # 첫 등장만 풀이
+            text = text[:idx] + gloss + text[idx + len(term):]
+    return text
+
+
+def show(text: str) -> str:
+    """결과 텍스트 표시 파이프라인: 용어 정리 → 핵심어 볼드."""
+    return highlight(plainify(text))
+
+
+def badge(text: str, bg: str, fg: str = "#FFFFFF") -> str:
+    return (f"<span style='background:{bg};color:{fg};padding:2px 9px;border-radius:11px;"
+            f"font-size:0.70rem;font-weight:700;margin-right:5px;white-space:nowrap;"
+            f"letter-spacing:0.2px'>{text}</span>")
+
+
+def layer_meta(layer: int):
+    return {
+        1: ("층1 · ITGC", GREY),
+        2: ("층2 · AIGC", ORANGE),
+        3: ("층3 · 프로세스", NAVY),
+    }.get(layer, (f"층{layer}", GREY))
+
+
+def section_bar(title: str, subtitle: str, color: str) -> str:
+    return (
+        f"<div style='border-left:6px solid {color};background:#F7F8FA;"
+        f"padding:10px 14px;border-radius:0 6px 6px 0;margin:6px 0 12px 0'>"
+        f"<div style='font-size:1.05rem;font-weight:800;color:{color}'>{title}</div>"
+        f"<div style='font-size:0.82rem;color:{GREY};margin-top:2px'>{subtitle}</div></div>"
+    )
+
+
+def render_card(card) -> None:
+    label, lcolor = layer_meta(card.layer)
+    with st.container(border=True):
+        badges = badge(card.control_id, GREY) + badge(label, lcolor)
+        if card.forced:
+            badges += badge("🔒 강제포함", SLATE)
+        st.markdown(
+            f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
+            f"<span style='font-size:1.02rem;font-weight:800;color:{NAVY};margin-right:6px'>"
+            f"{card.name}</span>{badges}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div style='color:{GREY};font-size:0.74rem;font-weight:700;"
+            f"margin:12px 0 2px 0;text-transform:uppercase;letter-spacing:0.4px'>왜 필요한가</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(show(card.why))
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='color:{GREY};font-size:0.74rem;font-weight:700;"
+            f"margin:0 0 2px 0;text-transform:uppercase;letter-spacing:0.4px'>"
+            f"구체적 실행 모습 · 기준서 언어</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(show(card.implementation))
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        rows = ""
+        for e in card.evidences:
+            ev = badge("검증완료", GREEN) if e.verified else badge("원문 대조 전", AMBER)
+            rows += (f"<div style='margin-top:3px'>📚 <b>{e.source}</b> "
+                     f"<span style='color:{GREY}'>({e.paragraph})</span> {ev}</div>")
+        meta = badge(f"근거 {len(card.evidences)}건", "#EEF0F3", SLATE)
+        meta += badge(f"신뢰도 {card.confidence:.2f}", "#EEF0F3", SLATE)
+        st.markdown(
+            f"<div style='border-top:1px solid #ECECEC;padding-top:8px;font-size:0.80rem;"
+            f"color:{SLATE}'>{rows}<div style='margin-top:6px'>{meta}</div></div>",
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# 헤더
+# ============================================================
+st.markdown(
+    f"<div style='display:flex;align-items:baseline;gap:10px'>"
+    f"<span style='font-size:1.9rem'>🧭</span>"
+    f"<span style='font-size:1.9rem;font-weight:800;color:{NAVY}'>AIGC Architect</span></div>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    f"<div style='border-left:5px solid {ORANGE};padding:6px 0 6px 12px;margin:4px 0 2px 0;"
+    f"color:{SLATE};font-size:0.95rem'>"
+    f"<b>ITGC가 자동통제의 신뢰 기반이었듯, AIGC는 AI 지원 통제의 신뢰 기반이다.</b><br>"
+    f"AI를 회계 프로세스에 도입할 때 어떤 경영진주장(재무제표가 옳다는 회사의 주장)이 위협받고 어떤 통제가 필요한지 설계합니다.</div>",
+    unsafe_allow_html=True,
+)
+c1, c2 = st.columns(2)
+c1.caption(f"🤖 LLM 모드 `{llm.llm_mode()}` · 🔎 임베딩 `{llm.embed_mode()}`")
+c2.caption("자기참조 설계 — 이 도구의 실행 통제 틀(Harness)은 이 도구가 설계하는 AIGC 통제를 스스로에게 적용")
+st.divider()
+
+# ============================================================
+# [1] 입력 — 2단 레이아웃
+# ============================================================
+left, right = st.columns([1, 1.25], gap="large")
+
+with left:
+    st.markdown(f"<div style='font-weight:800;color:{NAVY};font-size:1.05rem'>"
+                f"① 전제 조건 확인 · ITGC (층 1)</div>", unsafe_allow_html=True)
+    st.caption("층 1 없이 층 2 없고, 층 2 없이 층 3 없다. 하나라도 '아니오'면 하위 설계가 무의미합니다.")
+    gate = rb.itgc_gate()
+    itgc_answers: dict[str, bool] = {}
+    for chk in gate["checks"]:
+        itgc_answers[chk["id"]] = st.checkbox(
+            chk["question"], value=True, key=f"gate_{chk['id']}",
+            help=chk["why_prerequisite"],
+        )
+    override = False
+    if not all(itgc_answers.values()):
+        st.warning("ITGC 미비 항목이 있습니다. 조건부로 진행하려면 아래를 체크하세요.")
+        override = st.checkbox("⚠️ ITGC 미비를 인지하고 조건부로 진행", value=False)
+
+    st.markdown(layer_diagram(), unsafe_allow_html=True)
+
+with right:
+    st.markdown(f"<div style='font-weight:800;color:{NAVY};font-size:1.05rem'>"
+                f"② 산업 · 규모 · 조달</div>", unsafe_allow_html=True)
+    industries = rb.industries()
+    ind_keys = list(industries.keys())
+    ic1, ic2, ic3 = st.columns(3)
+    industry = ic1.selectbox("산업", ind_keys, format_func=lambda k: industries[k]["name"])
+    company_size = ic2.selectbox("기업 규모", COMPANY_SIZES, index=1,
+                                 help="통제 설계의 현실성을 조정합니다.")
+    model_sourcing = ic3.selectbox("모델 조달", MODEL_SOURCING, index=1)
+    st.caption(industries[industry]["description"])
+
+    procs = skills.identify_significant_accounts(industry)
+    st.markdown(f"<div style='font-weight:800;color:{NAVY};font-size:1.05rem;margin-top:6px'>"
+                f"③ AI 개입 프로세스 선택</div>", unsafe_allow_html=True)
+    st.caption("산업에 따라 목록이 실제로 달라집니다. ★=유의적 추정 · '해당 없음'은 계정 부존재로 제외됩니다.")
+    selected: list[str] = []
+    for p in procs:
+        default = p.significance in ("critical", "significant")
+        star = " ★" if p.significance == "critical" else ""
+        checked = st.checkbox(f"{p.name}{star}", value=default,
+                              key=f"proc_{p.process_id}", help=p.rationale)
+        if checked:
+            selected.append(p.process_id)
+            if p.significance == "low":
+                st.caption("↳ ⚠️ 우선순위 하위 — 유의적 계정 설계 후 검토 권장")
+
+st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+run = st.button("통제 설계 실행", type="primary", use_container_width=True, disabled=not selected)
+if not selected:
+    st.info("프로세스를 하나 이상 선택하세요.")
+
+# ============================================================
+# [2] 실행 — 스텝별 진행
+# ============================================================
+if run:
+    index = get_index()
+    inputs = AgentInputs(
+        industry=industry, selected_processes=selected,
+        itgc_answers=itgc_answers, override_itgc=override,
+        company_size=company_size, model_sourcing=model_sourcing,
+    )
+    status = st.status("에이전트 실행 중...", expanded=True)
+    output = None
+    for kind, payload in run_agent(inputs, index):
+        if kind == "step":
+            status.write(payload)
+            time.sleep(0.35)
+        elif kind == "done":
+            output = payload
+    status.update(label="에이전트 실행 완료", state="complete", expanded=False)
+    st.session_state["output"] = output
+    st.session_state["ctx"] = {"industry": industries[industry]["name"],
+                               "size": company_size, "sourcing": model_sourcing}
+
+# ============================================================
+# [3] 출력 — 탭
+# ============================================================
+output = st.session_state.get("output")
+if output is not None:
+    ctx = st.session_state.get("ctx", {})
+    st.markdown(
+        f"<div style='background:{NAVY};color:#fff;padding:10px 16px;border-radius:6px;"
+        f"font-weight:700;margin:4px 0 10px 0'>결과 · {ctx.get('industry','')} "
+        f"<span style='opacity:0.6'>|</span> {ctx.get('size','')} "
+        f"<span style='opacity:0.6'>|</span> {ctx.get('sourcing','')}</div>",
+        unsafe_allow_html=True,
+    )
+
+    if output.stopped_reason:
+        st.error(output.stopped_reason)
+        with st.expander("ITGC 게이트 상세"):
+            for cid in output.gate.failed_checks:
+                q = next(c["question"] for c in rb.itgc_gate()["checks"] if c["id"] == cid)
+                st.write(f"❌ {q}")
+            st.info(rb.itgc_gate()["fail_rationale"])
+    else:
+        tabs = st.tabs([
+            "✅ 전제 조건", "🗺️ 경영진주장 리스크 맵", "🎛️ 통제 스타터킷",
+            "👓 감사인 관점", "⚠️ 사람 검토 필요", "🔍 실행 로그",
+        ])
+
+        # --- 선결 확인 ---
+        with tabs[0]:
+            g = output.gate
+            (st.success if g.passed else st.warning)(g.message)
+            for chk in rb.itgc_gate()["checks"]:
+                ok = chk["id"] not in g.failed_checks
+                st.write(f"{'✅' if ok else '❌'} {chk['question']}")
+                st.caption(f"   → {chk['why_prerequisite']}")
+
+        # --- 어서션 리스크 맵 ---
+        with tabs[1]:
+            if not output.risks:
+                st.info("선택 프로세스의 통제 원장 리스크가 없습니다 (확장 예정 프로세스일 수 있음).")
+            cur = None
+            for r in output.risks:
+                if r.process_name != cur:
+                    cur = r.process_name
+                    st.markdown(f"<div style='font-weight:800;color:{NAVY};margin-top:10px'>"
+                                f"{cur}</div>", unsafe_allow_html=True)
+                st.markdown(f"- {show(r.risk)}")
+                st.caption(f"   영향받는 경영진주장: {plainify(r.assertion_impact)}")
+
+        # --- 통제 스타터킷 (3층 위계) ---
+        with tabs[2]:
+            acc = output.harness.accepted
+            l2 = [c for c in acc if c.layer == 2]
+            l3 = [c for c in acc if c.layer == 3]
+            l1 = [c for c in acc if c.layer == 1]
+            st.caption(f"수용된 통제 {len(acc)}개 · 층2(AIGC) {len(l2)} / 층3(프로세스) {len(l3)}"
+                       f"{f' / 층1 {len(l1)}' if l1 else ''}. "
+                       "근거 미검증 항목은 '원문 대조 전' 배지로 표시됩니다.")
+
+            st.markdown(
+                f"<div style='background:#F7F8FA;border:1px solid #E2E6EB;border-radius:8px;"
+                f"padding:10px 14px;margin-bottom:12px;font-size:0.86rem;color:{SLATE};line-height:1.55'>"
+                f"<b style='color:{ORANGE}'>AI 도입 후 통제 진화</b> — 사람의 역할은 "
+                f"<b>검토(Check) → 위험평가·상시 모니터링</b>으로, 테스트는 <b>표본 → 전수</b>로, "
+                f"기준은 <b>정성적 판단 → 명시적 정량화</b>로 전환됩니다. 아래 통제 카드는 이 전환을 반영합니다."
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(section_bar(
+                "🧩 층 2 · AIGC — AI 고유 통제",
+                "모델·프롬프트·학습데이터·비결정성, 툴셋·접근권한 제한, 전수·상시 모니터링 통제. AI를 신뢰 가능하게 만드는 기반.",
+                ORANGE), unsafe_allow_html=True)
+            for c in l2:
+                render_card(c)
+            if not l2:
+                st.info("이 조합에서 수용된 층2 통제가 없습니다. '사람 검토 필요' 탭을 확인하세요.")
+
+            st.markdown(
+                f"<div style='text-align:center;color:{ORANGE};font-weight:700;"
+                f"margin:14px 0 6px 0'>▲ 아래 층 3 통제는 위 층 2(AIGC)가 확보되어야 신뢰할 수 있다</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(section_bar(
+                "🏛️ 층 3 · 프로세스 통제 — 경영진주장 직접 담보",
+                "회계 계정별 통제. 층 2가 확보되었다는 전제 위에서만 유효.",
+                NAVY), unsafe_allow_html=True)
+            for c in l3:
+                render_card(c)
+            if not l3:
+                st.info("이 조합에서 수용된 층3 통제가 없습니다.")
+
+        # --- 감사인 관점 (벤치마킹 붕괴 콜아웃) ---
+        with tabs[3]:
+            st.markdown(
+                f"<div style='border-left:6px solid {ORANGE};background:#FBEEE6;"
+                f"padding:14px 18px;border-radius:0 8px 8px 0;color:{SLATE};line-height:1.65'>"
+                f"<div style='font-weight:800;color:{ORANGE};margin-bottom:4px'>"
+                f"⚡ 벤치마킹 논리의 붕괴</div>"
+                f"AI 기반 자동통제는 <b>비결정성</b>(같은 자료를 넣어도 결과가 달라질 수 있는 성질)으로 인해 기존 IT 환경의 "
+                f"<b>‘벤치마킹(Benchmarking, Sample=1) 논리’</b>가 적용되지 않습니다. 따라서 감사인은 "
+                f"<b>AIGC(층 2)</b>의 운영 유효성을 먼저 테스트한 후, 예외 사항에 대한 "
+                f"<b>경영진 검토통제(MRC)</b>에 <b>실증적 성격의 테스트</b>를 결합하여 접근해야 합니다."
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<div style='border-left:6px solid {NAVY};background:#F2F4F8;padding:12px 16px;"
+                f"border-radius:0 8px 8px 0;color:{SLATE};margin-top:12px;line-height:1.6'>"
+                f"<div style='font-weight:800;color:{NAVY};margin-bottom:4px'>⚖️ 경영진 책임 관점</div>"
+                f"상법 개정으로 이사의 내부통제 책임이 '감독'에서 '자기수행'으로 강화되었습니다. "
+                f"통제 미비는 단순 오류를 넘어 <b>선관주의 의무 위반·공시 위반 리스크</b>로 직결될 수 있으며, "
+                f"외부감사인보다 경영진이 선제적으로 취약점을 밝혀야 하는 방향입니다(핵심감사사항 KAM 반영 비율 높음)."
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            st.markdown(show(output.auditor_view))
+
+        # --- 사람 검토 필요 (격리) ---
+        with tabs[4]:
+            q = output.harness.quarantined
+            st.caption("에이전트가 확신하지 못해 확정하지 않고 격리한 항목 (Human-in-the-loop). "
+                       "대개 골격(outline) 단계로 원문 대조·상술이 필요합니다.")
+            for card in q:
+                label, lcolor = layer_meta(card.layer)
+                with st.container(border=True):
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
+                        f"<span style='font-weight:800;color:{NAVY};margin-right:6px'>{card.name}</span>"
+                        f"{badge(card.control_id, GREY)}{badge(label, lcolor)}"
+                        f"{badge(f'신뢰도 {card.confidence:.2f}', '#EEF0F3', SLATE)}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(show(card.implementation))
+                    st.caption("📚 근거 " + ", ".join(e.source for e in card.evidences) + " — 검토·상술 후 확정 대상")
+            if not q:
+                st.success("격리된 항목이 없습니다.")
+            if output.harness.rejected:
+                with st.expander(f"🚫 Harness가 폐기한 통제 {len(output.harness.rejected)}건 "
+                                 f"(스키마·근거 미확인)"):
+                    for m in output.harness.rejected:
+                        st.write(m)
+
+        # --- 실행 로그 ---
+        with tabs[5]:
+            st.caption("각 기능(스킬) 호출 순서 · 입력 · 검색된 문단(청크) · 출력 · 소요시간 (감사추적)")
+            for e in output.log.entries:
+                st.markdown(f"**[{e.step}] `{e.skill}`** · {e.elapsed_ms}ms")
+                st.caption(f"입력: {e.inputs}")
+                if e.retrieved_ids:
+                    st.caption(f"검색 청크: {', '.join(e.retrieved_ids)}")
+                st.caption(f"출력: {e.output_summary}")
+            if output.log.notes:
+                st.markdown(f"<div style='font-weight:800;color:{ORANGE};margin-top:6px'>"
+                            f"통제 이벤트 (분기·게이트·폐기)</div>", unsafe_allow_html=True)
+                for n in output.log.notes:
+                    st.write(f"- {n}")

@@ -1,0 +1,395 @@
+# ============================================================
+# AIGC Architect — 통제 원장 (Control Ledger)
+# ------------------------------------------------------------
+# 프로세스별 어서션 리스크 → 통제 → 근거의 매핑.
+# 이것이 LLM에게 주입되는 도메인 지식의 본체다.
+#
+# depth: deep   = 면접 방어 가능 수준까지 상술 (핵심 차별화 영역)
+#        outline = 골격만. 확장 예정
+#
+# ⚠️ 기준서 조항 번호는 원문 대조 전. evidence.verified 로 관리
+# ============================================================
+
+meta:
+  version: "0.3"
+  last_updated: "2026-07-13"  # 조항 13건 verified + 세미나 반영 신규통제 3·게이트 2 추가(원문 대조 전)
+  layer_definition:
+    layer_1: "ITGC — AI가 올라탄 시스템 통제 (선결 확인)"
+    layer_2: "AIGC — 모델·프롬프트·학습데이터 통제 (본 프로젝트 핵심)"
+    layer_3: "프로세스 통제 — 어서션을 직접 담보"
+
+# ------------------------------------------------------------
+# [층 1] ITGC 게이트 — 선결 확인 사항
+# ------------------------------------------------------------
+itgc_gate:
+  description: "층 1이 무너지면 층 2·3 전체가 무의미하다. 도구는 이를 게이팅한다."
+  checks:
+    - id: gate_access
+      question: "원장·ERP에 대한 접근권한 관리 및 직무분리가 설계·운영되고 있는가?"
+      why_prerequisite: "AI가 읽어오는 원천 데이터의 무결성 전제"
+    - id: gate_change
+      question: "응용시스템 변경관리 절차가 존재하는가?"
+      why_prerequisite: "AI 산출물이 전표로 유입되는 인터페이스의 안정성 전제"
+    - id: gate_operation
+      question: "IT 운영·백업·장애관리 통제가 존재하는가?"
+      why_prerequisite: "데이터 완전성 전제"
+    - id: gate_ai_pipeline
+      question: "AI 파이프라인 자체가 응용시스템으로서 ITGC 적용 대상에 포함되어 있는가?"
+      why_prerequisite: "AI 시스템도 접근·변경·운영 통제의 대상이다"
+    - id: gate_cyber_dlp
+      question: "AI 파이프라인에 대한 사이버보안·데이터 유출 방지(DLP) 통제가 존재하는가?"
+      why_prerequisite: "AI가 다루는 재무데이터의 유출·침해는 통제 신뢰의 전제. 최근 정보유출 사고로 내부통제의 핵심 영역으로 편입 (PwC 세미나)"
+    - id: gate_ai_law
+      question: "AI 기본법(2026.1 시행) 적용 여부(고위험 AI 분류 등)를 검토하였는가?"
+      why_prerequisite: "규제 적용 대상 여부가 AI 통제의 설계 강도를 좌우"
+  fail_message: |
+    ITGC 미비 상태에서는 AI 통제(AIGC)의 유효성이 성립하지 않습니다.
+    선결 과제는 ITGC 구축이며, 본 도구의 통제 설계는 ITGC가 유효함을 전제합니다.
+  fail_rationale: "층 1 없이 층 2 없고, 층 2 없이 층 3 없다"
+
+# ------------------------------------------------------------
+# 프로세스별 통제
+# ------------------------------------------------------------
+processes:
+
+  # ==========================================================
+  # ★ 핵심 1 — 프로젝트의 명제 그 자체
+  # ==========================================================
+  ai_performed_control:
+    depth: deep
+    name: "AI가 통제 자체를 수행하는 경우"
+    core_thesis: |
+      기존 통제 유형(수동 / 자동 / IT의존적 수동)에 "AI 지원 통제"가 추가된다.
+      자동통제처럼 보이지만 결과가 비결정적(non-deterministic)이라는 점이 결정적 차이다.
+
+    why_it_breaks: |
+      자동통제의 운영유효성 테스트는 "프로그램 로직이 일관되므로 소수 표본으로 충분하다"는
+      전제(benchmarking) 위에 성립한다. AI 지원 통제는 동일 입력에 상이한 출력이 가능하므로
+      이 전제가 붕괴한다.
+      → 표본 확대 또는 성능지표(정확도·재현율) 기반 테스트로 전환해야 한다.
+
+    risks:
+      - id: nondeterminism
+        risk: "동일 입력·상이 출력 → 통제 수행의 일관성 미담보"
+        assertion_impact: "통제가 담보하려던 모든 어서션에 간접 영향"
+      - id: ipe_recursion
+        risk: "AI 산출 정보를 통제에 사용 → 그 정보 자체가 검증 대상 IPE"
+        assertion_impact: "정확성·완전성"
+      - id: control_of_control
+        risk: "AI 통제가 유효하려면 그 AI에 대한 통제(AIGC)가 선행되어야 함"
+        assertion_impact: "전 어서션"
+      - id: excessive_agency
+        risk: "AI 에이전트가 과도한 시스템 접근권한·툴셋을 보유 → 오류·부정의 파급 범위 확대"
+        assertion_impact: "전 경영진주장 (간접)"
+
+    controls:
+      - id: aipc_01
+        layer: 2
+        name: "출력 일관성 검증 (비결정성 관리)"
+        design: "동일 입력 반복 실행 시 출력 일관성 측정. temperature·seed 고정. 허용 편차 임계 설정 및 이탈 시 에스컬레이션"
+        evidence:
+          - source: "감사기준서 330 (통제 의존 시 절차)"
+            paragraph: "문단 10(a)(ii)·(iii), A28–A29, 문단 17 · [보강] 감사기준서 1100 A128–A129"
+            verified: true
+          - source: "감사기준서 1100 (내부회계관리제도 감사) — 벤치마킹"
+            paragraph: "문단 100–102, A123–A129 · [보강] 감사기준서 330 문단 13, 14(b), A29"
+            verified: true
+        auditor_view: "출력 일관성이 담보되지 않으면 benchmarking 논리를 적용할 수 없다. 표본 확대가 불가피하다."
+
+      - id: aipc_02
+        layer: 2
+        name: "성능지표 기반 운영유효성 테스트"
+        design: "AI 통제의 정확도·재현율(예외 미탐지율)을 정기 측정. 표본 재수행(reperformance) 대신 성능 모니터링을 운영유효성 증거로 설계"
+        design_note: "감사인 관점에서 수용 가능한 지표·임계치를 사전 합의해야 함"
+        evidence:
+          - source: "감사기준서 330"
+            paragraph: "문단 8, 9, 10(a), A25, A28 · [표본] 감사기준서 530 보론 2"
+            verified: true
+        auditor_view: "AI 통제의 운영유효성은 '몇 건을 테스트했는가'가 아니라 '성능이 지속적으로 담보되는가'로 평가되어야 한다."
+
+      - id: aipc_03
+        layer: 2
+        name: "AI 산출물의 IPE 검증"
+        design: "AI가 생성한 예외 목록·대사 결과의 완전성·정확성 검증 절차. 원천 데이터 대비 건수 대사, 샘플 재수행"
+        evidence:
+          - source: "감사기준서 500 (기업이 생산한 정보)"
+            paragraph: "문단 9, A60–A62 · [보강] 감사기준서 330 A30, 540 A107, 내부회계관리제도 개념체계 50.4"
+            verified: true
+        auditor_view: "AI 아웃풋은 본질적으로 검증 대상 IPE다. 통제에 사용되는 순간 그 완전성·정확성이 감사 대상이 된다."
+
+      - id: aipc_04
+        layer: 3
+        name: "예외 처리의 인적 검토 (Human-in-the-loop)"
+        design: "AI가 탐지한 예외는 확정이 아닌 '검토 대상'으로 처리. 미탐지 위험에 대비한 독립적 샘플 검토 병행"
+        design_note: "삼일 K-SOX AI의 '추가 고려사항 하이라이트' 방식과 동일 사상"
+        evidence:
+          - source: "내부회계관리제도 설계·운영 개념체계"
+            paragraph: "문단 47.4(원칙10)·A55, 48.1(원칙11), 50.4(원칙13) · [보강] 감사기준서 330 문단 10(a)(iii); 1100 A53·A79"
+            verified: true
+        auditor_view: "AI가 통제를 '보조'하는가 '대체'하는가에 따라 통제 유형 분류와 테스트 접근이 달라진다."
+
+      - id: aipc_05
+        layer: 2
+        name: "모델 변경 시 통제 재평가"
+        design: "모델·프롬프트 변경 시 해당 통제의 설계·운영 유효성 재평가. 변경을 통제 변경으로 간주하여 문서화"
+        evidence:
+          - source: "내부회계관리제도 설계·운영 개념체계 원칙9(문단 46) · 감사기준서 1100"
+            paragraph: "개념체계 문단 46(원칙9)·46.2 · [감사] 1100 A66, 문단 44·A67·102; 330 문단 12(a)·14(a)·A37 · ※ 평가·보고 모범규준 본문 미제공(적용기법으로 보강)"
+            verified: true
+        auditor_view: "기중 모델 변경은 기중 통제 변경이다. 변경 전후 기간을 구분하여 평가해야 한다."
+
+      - id: aipc_06
+        layer: 2
+        name: "AI 에이전트의 시스템 접근권한·툴셋 제한"
+        design: "AI 에이전트가 사용할 수 있는 시스템·기능(툴셋)과 접근권한을 업무별로 최소권한 원칙에 따라 사전 매핑·제한한다. 전표 등록 등 변경 권한과 조회 권한을 분리하고, 부여된 툴셋 외 행위를 차단한다"
+        design_note: "삼정KPMG 세미나 — 에이전트에 시스템·T-code를 드래그앤드롭으로 부여하는 방식에 대한 통제 대응"
+        evidence:
+          - source: "내부회계관리제도 설계·운영 개념체계 (원칙 11 · 접근권한·직무분리)"
+            paragraph: "TBD"
+            verified: false
+          - source: "감사기준서 1100 (IT일반통제 — 접근보안)"
+            paragraph: "TBD"
+            verified: false
+        auditor_view: "AI 에이전트는 새로운 접근 주체다. 부여된 툴셋·권한이 최소권한·직무분리를 위반하면 자동화가 오히려 통제 위험을 키운다."
+
+      - id: aipc_07
+        layer: 2
+        name: "표본 대체 — 모집단 전수 검증 및 상시 모니터링"
+        design: "AI는 피로가 없어 표본추출 없이 모집단 전수를 검증할 수 있다. 통제 빈도를 '수시·일별'로 설정하고 사후 표본테스트를 상시 모니터링으로 전환한다. 전수 결과의 예외만 인적 검토 큐로 전달한다"
+        design_note: "PwC·삼정 세미나 — 벤치마킹(표본) 논리의 한계를 전수조사로 극복. 단, 전수의 근거가 되는 데이터(IPE) 완전성이 선행되어야 함"
+        evidence:
+          - source: "감사기준서 330 (통제테스트 범위)"
+            paragraph: "TBD"
+            verified: false
+          - source: "내부회계관리제도 설계·운영 개념체계 (원칙 16·17 · 상시적 모니터링)"
+            paragraph: "TBD"
+            verified: false
+        auditor_view: "전수 검증은 완전성·객관성을 높이지만, 전수의 근거가 되는 데이터(IPE)의 완전성이 담보되지 않으면 '전수'라는 외형만 남는다."
+
+      - id: aipc_08
+        layer: 2
+        name: "통제 기준의 정량화·문서화 (자동화 선행요건)"
+        design: "'적절성을 판단한다'와 같은 정성적·모호한 기준은 AI가 수행할 수 없다. 자동화 위임 전에 판단 기준·임계치·예외 규칙을 명시적으로 정량화·문서화하고, 정량화 불가한 판단은 자동화 범위에서 배제한다"
+        design_note: "삼정 세미나 — 감·기분·관계에 의존한 판단은 자동화 불가. 통제 기술서(자연어)로 기준을 상세화하여 학습"
+        evidence:
+          - source: "내부회계관리제도 설계·운영 개념체계 (원칙 12 · 정책과 절차의 정립)"
+            paragraph: "TBD"
+            verified: false
+        auditor_view: "자동화의 전제는 기준의 명확성이다. 모호한 기준을 AI에 위임하면 통제의 설계 자체가 성립하지 않는다."
+
+  # ==========================================================
+  # ★ 핵심 2 — 최고 차별화 (감사기준서 540 영역)
+  # ==========================================================
+  ecl_estimation:
+    depth: deep
+    name: "대손충당금·기대신용손실(ECL) 추정"
+    standard: "K-IFRS 1109"
+
+    core_thesis: |
+      회계추정은 본질적으로 경영진의 판단이다.
+      AI가 숫자를 산출했다는 사실이 그 판단 책임을 이전시키지 않는다.
+      따라서 이 영역 통제의 본체는 "경영진이 AI 산출물을 이해하고, 가정을 검토하고,
+      책임지고 승인했는가"를 증거로 남기는 검토통제다.
+
+    risks:
+      - id: blackbox_estimate
+        risk: "PD·LGD 모델의 가정·가중치가 블랙박스화 → 경영진이 추정을 설명·방어 불가"
+        assertion_impact: "평가"
+      - id: forward_looking
+        risk: "미래전망정보(경기지표 등) 반영 로직이 검증 불가"
+        assertion_impact: "평가"
+      - id: silent_model_change
+        risk: "모델 변경이 충당금 수준을 조용히 변동시킴 → 추정 변경 인지 실패"
+        assertion_impact: "평가, 기간귀속"
+      - id: management_override
+        risk: "모델 산출치에 대한 경영진 조정(overlay)의 근거 부재"
+        assertion_impact: "평가"
+
+    controls:
+      - id: ecl_01
+        layer: 3
+        name: "가정의 명시적 문서화"
+        design: "AI 모델이 사용한 변수·가중치·미래전망 시나리오를 산출물에 필수 포함. 설명 없는 산출치는 회계처리에 사용 금지"
+        evidence:
+          - source: "감사기준서 540 (회계추정치 감사)"
+            paragraph: "문단 13(h)(ii)a.ii, 22, 24, 39(a)·(b) · [범위제한] 감사기준서 705 문단 4(b) · [보강] 내부회계관리제도 개념체계 문단 30"
+            verified: true
+          - source: "K-IFRS 1109"
+            paragraph: "문단 5.5.17, 5.5.4, 5.5.11, 5.5.9, B5.5.49·B5.5.51·B5.5.52 · [PD/LGD] 사례8 IE49~, IE35, 사례9 IE53~57"
+            verified: true
+        auditor_view: "가정이 문서화되지 않으면 감사인은 추정의 합리성을 평가할 수 없다. 이는 감사범위 제한에 해당할 수 있다."
+
+      - id: ecl_02
+        layer: 3
+        name: "경영진 검토통제 (Management Review Control)"
+        design: "산출 근거를 이해하고 승인했다는 증거. '검토함' 서명이 아니라 무엇을 어떻게 검토했는지(이상치 확인, 전기 대비 변동 원인 규명)를 기록"
+        design_note: "MRC의 정밀도(precision)가 이 통제의 유효성을 결정"
+        evidence:
+          - source: "감사기준서 540"
+            paragraph: "문단 13(i), 19, 20, A50–A51, A85–A86"
+            verified: true
+        auditor_view: "AI를 썼다는 이유로 경영진 검토통제의 정밀도 요구가 낮아지지 않는다. 오히려 블랙박스일수록 검토의 실질이 중요해진다."
+
+      - id: ecl_03
+        layer: 2
+        name: "모델 백테스트 및 성능 모니터링"
+        design: "모델 산출 PD vs 실제 부도율 사후 비교(백테스트). 편차 임계 초과 시 모델 재검토"
+        evidence:
+          - source: "감사기준서 540"
+            paragraph: "문단 13(j), 14, A55–A58, A60 · [보강] K-IFRS 1109 B5.5.52"
+            verified: true
+        auditor_view: "추정의 정확성은 사후 결과와의 비교로 검증된다. 백테스트 부재는 추정 프로세스의 통제 결함이다."
+
+      - id: ecl_04
+        layer: 2
+        name: "모델 변경의 회계적 판단"
+        design: "모델 변경 시 '회계추정의 변경'에 해당하는지 판단·문서화. 변경 영향 정량화 및 주석 공시 검토"
+        evidence:
+          - source: "K-IFRS 1008 (회계정책·회계추정의 변경)"
+            paragraph: "문단 5, 32A, 32B, 34, 34A, 35, 36–37, 38, 39–40"
+            verified: true
+        auditor_view: "모델 교체는 기술적 업데이트가 아니라 회계추정 방법의 변경일 수 있다."
+
+      - id: ecl_05
+        layer: 3
+        name: "경영진 조정(Overlay) 통제"
+        design: "모델 산출치를 경영진이 조정하는 경우, 조정 근거·승인권자·금액을 문서화. 조정 한도 및 승인 체계 사전 설정"
+        evidence:
+          - source: "감사기준서 540 — 경영진 편의(management bias)"
+            paragraph: "A100(문단 23(d)(ii)), 문단 32, A133–A134, 문단 39(d) · [보강] K-IFRS 1109 문단 5.5.17⑴"
+            verified: true
+        auditor_view: "모델 조정은 경영진 편의가 개입하는 지점이다. 감사인의 주된 관심 영역."
+
+      - id: ecl_06
+        layer: 2
+        name: "학습·참조 데이터 거버넌스"
+        design: "모델 학습·참조 데이터의 출처·계보·품질 관리. 데이터 오염 시 추정 전체가 왜곡됨(GIGO)"
+        evidence:
+          - source: "감사기준서 540 — 데이터의 적합성·완전성"
+            paragraph: "문단 25, A106–A108, 23(e)·A101, A52 · [연결] 감사기준서 500 문단 9; K-IFRS 1109 B5.5.49·B5.5.51"
+            verified: true
+        auditor_view: "추정에 사용된 데이터의 적합성·완전성은 감사 대상이다."
+
+  # ==========================================================
+  # 이하 골격 (outline) — 선배 피드백 후 선택적 확장
+  # ==========================================================
+  fair_value:
+    depth: outline
+    name: "금융상품 공정가치 평가"
+    standard: "K-IFRS 1113"
+    risks:
+      - risk: "레벨2·3 관측불가능 투입변수를 AI가 생성 → 검증 불가"
+        assertion_impact: "평가"
+    controls:
+      - id: fv_01
+        layer: 3
+        name: "투입변수 출처·산정근거 추적"
+        design: "AI가 생성한 투입변수의 근거 데이터·산출 로직 문서화"
+      - id: fv_02
+        layer: 3
+        name: "독립적 재계산 (교차검증)"
+        design: "상이한 방법·모델로 산출한 값과 비교"
+
+  revenue_recognition:
+    depth: outline
+    name: "수익인식 (계약서 자동 판독)"
+    standard: "K-IFRS 1115"
+    risks:
+      - risk: "AI가 계약 조항을 오독하여 수행의무 누락 또는 시점 오판"
+        assertion_impact: "발생사실, 완전성, 기간귀속"
+    controls:
+      - id: rev_01
+        layer: 3
+        name: "AI 판독 결과 vs 원본 계약 대사"
+        design: "추출 항목과 계약 원문 대조. 표본 검토"
+      - id: rev_02
+        layer: 3
+        name: "판단 요소의 자동화 배제"
+        design: "복합·비표준 계약, 수행의무 식별이 모호한 계약은 자동 처리 범위에서 제외 (AI 적용 범위 명시)"
+
+  inventory_obsolescence:
+    depth: outline
+    name: "재고 진부화·순실현가치"
+    standard: "K-IFRS 1002"
+    risks:
+      - risk: "판매 예측 모델 편향 → 평가손실 과소계상"
+        assertion_impact: "평가"
+    controls:
+      - id: inv_01
+        layer: 2
+        name: "예측 정확도 사후 모니터링"
+        design: "예측 vs 실제 판매 비교. 편차 임계 초과 시 재검토"
+
+  lease_recognition:
+    depth: outline
+    name: "리스 인식"
+    standard: "K-IFRS 1116"
+    risks:
+      - risk: "리스기간·연장옵션 판단 오류 → 부채 과소계상"
+        assertion_impact: "발생사실, 평가, 완전성"
+    controls:
+      - id: lea_01
+        layer: 3
+        name: "판단 요소 자동화 배제"
+        design: "연장·해지 옵션 행사 가능성 판단은 AI 자동 처리에서 제외"
+
+  poc_estimation:
+    depth: outline
+    name: "진행률 추정 (총원가 추정)"
+    standard: "K-IFRS 1115"
+    risks:
+      - risk: "총예정원가 예측 모델의 편향이 진행률·수익을 직접 왜곡"
+        assertion_impact: "평가, 기간귀속"
+    controls:
+      - id: poc_01
+        layer: 3
+        name: "추정 변경의 근거 문서화 및 경영진 검토"
+        design: "총예정원가 변경 시 원인·근거·승인 기록"
+
+  journal_entry:
+    depth: outline
+    name: "전표 자동 생성·계정 분류"
+    risks:
+      - risk: "오분류의 체계적 반복 — 한 번 틀리면 전량 틀림"
+        assertion_impact: "분류, 정확성, 완전성"
+    controls:
+      - id: je_01
+        layer: 3
+        name: "신규·비경상 거래의 자동 분류 배제"
+        design: "학습 범위 밖 거래 유형은 인적 처리로 라우팅"
+      - id: je_02
+        layer: 2
+        name: "분류 규칙 변경관리"
+        design: "분류 로직·프롬프트 변경을 변경관리 대상으로 관리"
+
+  disclosure_draft:
+    depth: outline
+    name: "주석·공시 초안 생성"
+    risks:
+      - risk: "할루시네이션 — 존재하지 않는 수치·사실 생성"
+        assertion_impact: "표시와 공시, 완전성"
+    controls:
+      - id: dis_01
+        layer: 2
+        name: "수치 자유생성 금지"
+        design: "모든 수치는 원장 조회로만 삽입. LLM 자유생성 영역과 조회 영역을 구조적으로 분리"
+      - id: dis_02
+        layer: 3
+        name: "주석 문안 vs 재무제표 수치 자동 대사"
+        design: "생성된 문안의 모든 수치를 원장과 대사"
+
+  evidence_ocr:
+    depth: outline
+    name: "증빙 OCR·데이터 입력"
+    risks:
+      - risk: "인식 오류가 하류 전 과정으로 전파"
+        assertion_impact: "정확성, 발생사실"
+    controls:
+      - id: ocr_01
+        layer: 3
+        name: "핵심 필드 검증 규칙"
+        design: "금액·일자 등 핵심 필드의 합계 대사, 형식 검증"
+      - id: ocr_02
+        layer: 3
+        name: "저품질 증빙 사전 반려 (Pre-assessment)"
+        design: "판독 신뢰도 임계 미달 시 처리 전 반려"
