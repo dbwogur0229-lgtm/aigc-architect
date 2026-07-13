@@ -11,7 +11,7 @@
 # ============================================================
 
 meta:
-  version: "0.3"
+  version: "0.4"
   last_updated: "2026-07-13"  # 조항 13건 verified + 세미나 반영 신규통제 3·게이트 2 추가(원문 대조 전)
   layer_definition:
     layer_1: "ITGC — AI가 올라탄 시스템 통제 (선결 확인)"
@@ -22,24 +22,31 @@ meta:
 # [층 1] ITGC 게이트 — 선결 확인 사항
 # ------------------------------------------------------------
 itgc_gate:
-  description: "층 1이 무너지면 층 2·3 전체가 무의미하다. 도구는 이를 게이팅한다."
+  description: "층 1이 무너지면 층 2·3 전체가 무의미하다. 감사기준서 315 보론6의 IT 프로세스 대분류(접근·변경·운영)를 따라 선결 확인한다."
+  categories_reference: "감사기준서 315 보론6-2 (IT 일반통제의 IT 프로세스별 예시)"
   checks:
     - id: gate_access
-      question: "원장·ERP에 대한 접근권한 관리 및 직무분리가 설계·운영되고 있는가?"
-      why_prerequisite: "AI가 읽어오는 원천 데이터의 무결성 전제"
+      category: "① 접근 관리 · KSA 315 보론6-2(a)"
+      question: "원장·ERP·AI 응용프로그램에 대한 접근권한 관리(인증·권한부여·업무분장)가 설계·운영되고 있는가?"
+      why_prerequisite: "인증·프로비저닝·특별권한·사용자 접근검토 통제(보론6-2a). AI가 읽어오는 원천 데이터의 무결성 전제"
     - id: gate_change
-      question: "응용시스템 변경관리 절차가 존재하는가?"
-      why_prerequisite: "AI 산출물이 전표로 유입되는 인터페이스의 안정성 전제"
+      category: "② 변경·개발 관리 · KSA 315 보론6-2(b)"
+      question: "응용시스템·AI 파이프라인의 변경관리 및 개발·구매·이관 절차(이관 업무분장 포함)가 존재하는가?"
+      why_prerequisite: "변경 이관 업무분장·시스템 개발/구매·데이터 변환 통제(보론6-2b). AI 산출물이 전표로 유입되는 인터페이스의 안정성 전제"
     - id: gate_operation
-      question: "IT 운영·백업·장애관리 통제가 존재하는가?"
-      why_prerequisite: "데이터 완전성 전제"
-    - id: gate_ai_pipeline
-      question: "AI 파이프라인 자체가 응용시스템으로서 ITGC 적용 대상에 포함되어 있는가?"
-      why_prerequisite: "AI 시스템도 접근·변경·운영 통제의 대상이다"
+      category: "③ IT 운영·보안 · KSA 315 보론6-2(c)"
+      question: "IT 운영(작업 일정·모니터링)·백업·복구 통제가 존재하는가?"
+      why_prerequisite: "작업 모니터링·백업복구 통제(보론6-2c). 데이터 완전성·가용성 전제"
     - id: gate_cyber_dlp
-      question: "AI 파이프라인에 대한 사이버보안·데이터 유출 방지(DLP) 통제가 존재하는가?"
-      why_prerequisite: "AI가 다루는 재무데이터의 유출·침해는 통제 신뢰의 전제. 최근 정보유출 사고로 내부통제의 핵심 영역으로 편입 (PwC 세미나)"
+      category: "③ IT 운영·보안 · KSA 315 보론6-2(c)"
+      question: "AI 파이프라인에 대한 사이버보안(침입탐지)·데이터 유출 방지(DLP) 통제가 존재하는가?"
+      why_prerequisite: "보론6-2(c) 침입탐지 + 감사기준서 315 A174(사이버보안·아웃소싱은 IT 사용 위험의 원천). 최근 정보유출 트렌드 (PwC 세미나)"
+    - id: gate_ai_pipeline
+      category: "④ AI 고유 선결 · 프로젝트"
+      question: "AI 파이프라인 자체가 응용시스템으로서 ITGC 적용 대상에 포함되어 있는가?"
+      why_prerequisite: "AI 시스템도 접근·변경·운영 통제(보론6)의 대상이다. 단 AI 고유 리스크(비결정성·드리프트)는 ITGC로 안 덮이며 층2 AIGC가 담당한다"
     - id: gate_ai_law
+      category: "④ AI 고유 선결 · 프로젝트"
       question: "AI 기본법(2026.1 시행) 적용 여부(고위험 AI 분류 등)를 검토하였는가?"
       why_prerequisite: "규제 적용 대상 여부가 AI 통제의 설계 강도를 좌우"
   fail_message: |
@@ -119,6 +126,7 @@ processes:
 
       - id: aipc_04
         layer: 3
+        activity_type: "검증"
         name: "예외 처리의 인적 검토 (Human-in-the-loop)"
         design: "AI가 탐지한 예외는 확정이 아닌 '검토 대상'으로 처리. 미탐지 위험에 대비한 독립적 샘플 검토 병행"
         design_note: "삼일 K-SOX AI의 '추가 고려사항 하이라이트' 방식과 동일 사상"
@@ -208,6 +216,7 @@ processes:
     controls:
       - id: ecl_01
         layer: 3
+        activity_type: "검증"
         name: "가정의 명시적 문서화"
         design: "AI 모델이 사용한 변수·가중치·미래전망 시나리오를 산출물에 필수 포함. 설명 없는 산출치는 회계처리에 사용 금지"
         evidence:
@@ -221,6 +230,7 @@ processes:
 
       - id: ecl_02
         layer: 3
+        activity_type: "권한부여·승인"
         name: "경영진 검토통제 (Management Review Control)"
         design: "산출 근거를 이해하고 승인했다는 증거. '검토함' 서명이 아니라 무엇을 어떻게 검토했는지(이상치 확인, 전기 대비 변동 원인 규명)를 기록"
         design_note: "MRC의 정밀도(precision)가 이 통제의 유효성을 결정"
@@ -252,6 +262,7 @@ processes:
 
       - id: ecl_05
         layer: 3
+        activity_type: "권한부여·승인"
         name: "경영진 조정(Overlay) 통제"
         design: "모델 산출치를 경영진이 조정하는 경우, 조정 근거·승인권자·금액을 문서화. 조정 한도 및 승인 체계 사전 설정"
         evidence:
@@ -283,10 +294,12 @@ processes:
     controls:
       - id: fv_01
         layer: 3
+        activity_type: "검증"
         name: "투입변수 출처·산정근거 추적"
         design: "AI가 생성한 투입변수의 근거 데이터·산출 로직 문서화"
       - id: fv_02
         layer: 3
+        activity_type: "검증"
         name: "독립적 재계산 (교차검증)"
         design: "상이한 방법·모델로 산출한 값과 비교"
 
@@ -300,6 +313,7 @@ processes:
     controls:
       - id: rev_01
         layer: 3
+        activity_type: "대사"
         name: "AI 판독 결과 vs 원본 계약 대사"
         design: "추출 항목과 계약 원문 대조. 표본 검토"
       - id: rev_02
@@ -343,6 +357,7 @@ processes:
     controls:
       - id: poc_01
         layer: 3
+        activity_type: "권한부여·승인"
         name: "추정 변경의 근거 문서화 및 경영진 검토"
         design: "총예정원가 변경 시 원인·근거·승인 기록"
 
@@ -375,6 +390,7 @@ processes:
         design: "모든 수치는 원장 조회로만 삽입. LLM 자유생성 영역과 조회 영역을 구조적으로 분리"
       - id: dis_02
         layer: 3
+        activity_type: "대사"
         name: "주석 문안 vs 재무제표 수치 자동 대사"
         design: "생성된 문안의 모든 수치를 원장과 대사"
 
@@ -387,9 +403,11 @@ processes:
     controls:
       - id: ocr_01
         layer: 3
+        activity_type: "검증"
         name: "핵심 필드 검증 규칙"
         design: "금액·일자 등 핵심 필드의 합계 대사, 형식 검증"
       - id: ocr_02
         layer: 3
+        activity_type: "검증"
         name: "저품질 증빙 사전 반려 (Pre-assessment)"
         design: "판독 신뢰도 임계 미달 시 처리 전 반려"

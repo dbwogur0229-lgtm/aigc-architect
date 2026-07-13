@@ -3,7 +3,7 @@ app.py — AIGC Architect Streamlit UI
 ------------------------------------------------------------
 화면 흐름: [1] 입력(2단) → [2] 스텝별 실행(Agent 증명) → [3] 탭 출력
 톤앤매너: 삼일회계법인(PwC) 오렌지 포인트 + 차분한 네이비/그레이 베이스.
-통제 스타터킷은 3층 구조(층2 AIGC → 층3 프로세스)를 시각적으로 위계화한다.
+통제 설계안은 3층 구조(층2 AIGC → 층3 프로세스)를 시각적으로 위계화한다.
 """
 from __future__ import annotations
 
@@ -36,37 +36,37 @@ GREEN = "#2E7D32"
 
 # 3층 구조 도식 (입력 화면 좌측 — 처음 보는 사람도 프레임워크를 이해하도록)
 def layer_diagram() -> str:
-    box = ("border-radius:7px;padding:11px 13px;margin:0;"
-           "box-shadow:0 1px 2px rgba(0,0,0,0.05)")
-    arrow = (f"<div style='text-align:center;color:{ORANGE};font-size:0.9rem;"
-             f"line-height:1.1;margin:5px 0'>&#9650;<span style='color:{GREY};"
-             f"font-size:0.72rem;margin-left:5px'>신뢰의 근거</span></div>")
+    tier = ("height:66px;display:flex;flex-direction:column;align-items:center;"
+            "justify-content:center;color:#fff;text-align:center")
     return (
         f"<div style='margin-top:20px'>"
         f"<div style='font-weight:800;color:{NAVY};font-size:1.0rem;margin-bottom:10px'>"
         f"🏗️ 통제의 3층 구조</div>"
-        # 층 3
-        f"<div style='border:1px solid #D9DEE5;border-left:7px solid {NAVY};"
-        f"background:#F7F8FA;{box}'>"
-        f"<b style='color:{NAVY}'>층 3 · AI 지원 통제</b>"
-        f"<div style='font-size:0.78rem;color:{GREY};margin-top:2px'>"
-        f"AI가 개입한 회계 프로세스 통제 &rarr; 재무제표 경영진주장을 직접 담보</div></div>"
-        f"{arrow}"
+        f"<div style='position:relative'>"
+        # 층 3 (꼭대기)
+        f"<div style='background:{NAVY};clip-path:polygon(35% 0,65% 0,75% 100%,25% 100%);{tier}'>"
+        f"<div style='font-weight:800;font-size:0.9rem'>층 3 · 프로세스 통제</div>"
+        f"<div style='font-size:0.68rem;opacity:0.9'>경영진주장 수준 위험 대응</div></div>"
         # 층 2 (핵심)
-        f"<div style='border:2px solid {ORANGE};border-left:7px solid {ORANGE};"
-        f"background:#FBEEE6;{box}'>"
-        f"<b style='color:{ORANGE}'>층 2 · AIGC &#9733; 본 도구의 핵심</b>"
-        f"<div style='font-size:0.78rem;color:{SLATE};margin-top:2px'>"
-        f"모델&middot;프롬프트&middot;학습데이터 통제 &rarr; AI 고유 리스크(같은 입력에도 결과가 달라짐&middot;판단 근거 불투명&middot;시간이 지나며 성능 변화)</div></div>"
-        f"{arrow}"
-        # 층 1
-        f"<div style='border:1px solid #D9DEE5;border-left:7px solid {GREY};"
-        f"background:#F1F2F4;{box}'>"
-        f"<b style='color:{SLATE}'>층 1 · ITGC (전제 조건 확인)</b>"
-        f"<div style='font-size:0.78rem;color:{GREY};margin-top:2px'>"
-        f"AI가 올라탄 시스템 통제(ERP&middot;원장&middot;AI 파이프라인) &rarr; 갖춰졌는지 여부만 확인(통제 설계는 안 함)</div></div>"
-        f"<div style='font-size:0.79rem;color:{GREY};margin-top:10px;text-align:center;"
-        f"font-style:italic'>&ldquo;층 1 없이 층 2 없고, 층 2 없이 층 3 없다&rdquo;</div>"
+        f"<div style='background:{ORANGE};clip-path:polygon(25% 0,75% 0,85% 100%,15% 100%);{tier}'>"
+        f"<div style='font-weight:800;font-size:0.92rem'>층 2 · AIGC &#9733;</div>"
+        f"<div style='font-size:0.68rem;opacity:0.95'>AI 고유 통제 · 본 도구 핵심</div></div>"
+        # 층 1 (기반)
+        f"<div style='background:{GREY};clip-path:polygon(15% 0,85% 0,95% 100%,5% 100%);{tier}'>"
+        f"<div style='font-weight:800;font-size:0.9rem'>층 1 · ITGC</div>"
+        f"<div style='font-size:0.68rem;opacity:0.9'>시스템 통제 · 선결 확인</div></div>"
+        f"</div>"
+        f"<div style='background:#FBEEE6;border:1px solid #F3D6C6;border-radius:6px;"
+        f"padding:8px 11px;margin-top:10px;font-size:0.72rem;color:{SLATE};line-height:1.5'>"
+        f"<b style='color:{ORANGE}'>AIGC = AI General Controls</b><br>"
+        f"ITGC(IT일반통제)가 시스템 통제의 신뢰 기반이듯, AIGC는 AI 모델 자체"
+        f"(모델·프롬프트·학습데이터·비결정성)를 규율하는 통제입니다. 아직 공식 기준서에 없는 "
+        f"신개념으로, 본 프로젝트가 재무보고 통제 맥락에서 구체화합니다.</div>"
+        f"<div style='font-size:0.75rem;color:{GREY};margin-top:10px;text-align:center;"
+        f"font-style:italic'>&#9650; 아래 층이 위 층의 신뢰 근거 &mdash; "
+        f"&ldquo;층 1 없이 층 2 없고, 층 2 없이 층 3 없다&rdquo;</div>"
+        f"<div style='font-size:0.68rem;color:{GREY};margin-top:4px;text-align:center'>"
+        f"층 3 근거 · 감사기준서 315 문단 26 (경영진주장 수준 위험 대처 통제)</div>"
         f"</div>"
     )
 
@@ -158,6 +158,8 @@ def render_card(card) -> None:
         badges = badge(card.control_id, GREY) + badge(label, lcolor)
         if card.forced:
             badges += badge("🔒 강제포함", SLATE)
+        if card.activity_type:
+            badges += badge(f"유형 · {card.activity_type}", "#0F766E")
         st.markdown(
             f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
             f"<span style='font-size:1.02rem;font-weight:800;color:{NAVY};margin-right:6px'>"
@@ -225,11 +227,19 @@ with left:
     st.caption("층 1 없이 층 2 없고, 층 2 없이 층 3 없다. 하나라도 '아니오'면 하위 설계가 무의미합니다.")
     gate = rb.itgc_gate()
     itgc_answers: dict[str, bool] = {}
+    _groups: dict[str, list] = {}
     for chk in gate["checks"]:
-        itgc_answers[chk["id"]] = st.checkbox(
-            chk["question"], value=True, key=f"gate_{chk['id']}",
-            help=chk["why_prerequisite"],
-        )
+        _groups.setdefault(chk.get("category", "기타"), []).append(chk)
+    for _cat, _checks in _groups.items():
+        st.markdown(f"<div style='font-size:0.78rem;font-weight:700;color:{ORANGE};"
+                    f"margin:8px 0 2px 0'>{_cat}</div>", unsafe_allow_html=True)
+        for chk in _checks:
+            itgc_answers[chk["id"]] = st.checkbox(
+                chk["question"], value=True, key=f"gate_{chk['id']}",
+                help=chk["why_prerequisite"],
+            )
+    st.caption("감사기준서 315 보론6의 IT 프로세스 대분류(접근·변경·운영)를 따릅니다. "
+               "보론6은 AI 고유 리스크(비결정성·드리프트 등)를 다루지 않으므로 그 영역은 층2 AIGC가 담당합니다.")
     override = False
     if not all(itgc_answers.values()):
         st.warning("ITGC 미비 항목이 있습니다. 조건부로 진행하려면 아래를 체크하세요.")
@@ -315,7 +325,7 @@ if output is not None:
             st.info(rb.itgc_gate()["fail_rationale"])
     else:
         tabs = st.tabs([
-            "✅ 전제 조건", "🗺️ 경영진주장 리스크 맵", "🎛️ 통제 스타터킷",
+            "✅ 전제 조건", "🗺️ 경영진주장 리스크 맵", "🎛️ 통제 설계안",
             "👓 감사인 관점", "⚠️ 사람 검토 필요", "🔍 실행 로그",
         ])
 
@@ -341,7 +351,7 @@ if output is not None:
                 st.markdown(f"- {show(r.risk)}")
                 st.caption(f"   영향받는 경영진주장: {plainify(r.assertion_impact)}")
 
-        # --- 통제 스타터킷 (3층 위계) ---
+        # --- 통제 설계안 (3층 위계) ---
         with tabs[2]:
             acc = output.harness.accepted
             l2 = [c for c in acc if c.layer == 2]
@@ -349,7 +359,7 @@ if output is not None:
             l1 = [c for c in acc if c.layer == 1]
             st.caption(f"수용된 통제 {len(acc)}개 · 층2(AIGC) {len(l2)} / 층3(프로세스) {len(l3)}"
                        f"{f' / 층1 {len(l1)}' if l1 else ''}. "
-                       "근거 미검증 항목은 '원문 대조 전' 배지로 표시됩니다.")
+                       "판정이 아니라 '이 프로필이면 이런 통제가 필요하다'는 설계 권고입니다. 근거 미검증 항목은 '원문 대조 전' 배지로 표시됩니다.")
 
             st.markdown(
                 f"<div style='background:#F7F8FA;border:1px solid #E2E6EB;border-radius:8px;"
@@ -375,7 +385,7 @@ if output is not None:
                 unsafe_allow_html=True,
             )
             st.markdown(section_bar(
-                "🏛️ 층 3 · 프로세스 통제 — 경영진주장 직접 담보",
+                "🏛️ 층 3 · 프로세스 통제 — 경영진주장 수준 위험 대응",
                 "회계 계정별 통제. 층 2가 확보되었다는 전제 위에서만 유효.",
                 NAVY), unsafe_allow_html=True)
             for c in l3:
@@ -422,6 +432,7 @@ if output is not None:
                         f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
                         f"<span style='font-weight:800;color:{NAVY};margin-right:6px'>{card.name}</span>"
                         f"{badge(card.control_id, GREY)}{badge(label, lcolor)}"
+                        f"{badge('유형 · '+card.activity_type, '#0F766E') if card.activity_type else ''}"
                         f"{badge(f'신뢰도 {card.confidence:.2f}', '#EEF0F3', SLATE)}</div>",
                         unsafe_allow_html=True,
                     )

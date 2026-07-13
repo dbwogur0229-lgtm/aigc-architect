@@ -75,6 +75,7 @@ class ControlCard(BaseModel):
     layer: Literal[1, 2, 3]
     confidence: float = 1.0
     forced: bool = False         # 비결정성 통제 등 Agent 가 강제 포함했는지
+    activity_type: str | None = None  # 보론3-20 통제활동 유형 (권한부여·승인/대사/검증/물리적·논리적/업무분장)
 
     @field_validator("evidences")
     @classmethod
