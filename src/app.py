@@ -152,7 +152,40 @@ def section_bar(title: str, subtitle: str, color: str) -> str:
     )
 
 
-def render_card(card) -> None:
+SIZE_NOTE = {
+    "중소기업": "소규모·저복잡 기업: 통제가 덜 공식화됐을 수 있어 <b>위험기반</b> 접근. 이상적 업무분장이 어려우면 <b>보완적 적발통제</b>로 대체(315 보론3-20). ITGC 문서화가 낮을 수 있어 관찰·검사로 보완(315 A33·A170).",
+    "중견기업": "중간 복잡성: 핵심 계정 중심의 공식 통제와 위험기반 표본을 병행. 통제 공식화 정도에 따라 절차 범위 조정(315 A16).",
+    "대기업": "전담 IT 조직·<b>공식 ITGC</b> 전제(315 A170). 자동화 의존이 커 <b>전수·상시 모니터링</b>(aipc_07) 적용 여지가 크다.",
+}
+SIZE_EMPH = {"대기업": {"aipc_07"}}
+SRC_NOTE = {
+    "외부 API": "<b>서비스조직 이용에 해당(감사기준서 402)</b>: SOC <b>유형2 보고서</b>(설계+운영효과성)로 공급사 통제 의존 여부를 결정, <b>상호보완적 이용자기업통제</b> 식별, 잔여위험 평가. 모델 내부 검증 불가 → 산출물(<b>IPE</b>) 검증·사이버보안·DLP 강조(315 A174).",
+    "자체개발": "내부 개발·운영: 시스템 개발·변경관리(315 보론6-2b), <b>학습데이터 거버넌스</b>(ecl_06), 모델 변경관리(aipc_05)가 내부 책임. 서비스조직(402) 미적용.",
+    "벤더 모델": "구매 소프트웨어 성격(315 A126): <b>변경관리·벤더 버전관리</b>(aipc_05) 중심. 벤더가 클라우드로 운영하면 서비스조직(402) 적용.",
+}
+SRC_EMPH = {"외부 API": {"aipc_03", "aipc_02"}, "자체개발": {"ecl_06", "aipc_05"}, "벤더 모델": {"aipc_05"}}
+
+
+def combo_context(size: str, sourcing: str):
+    """선택한 기업 규모 × 모델 조달에 따른 기준서 근거 맥락 진단 + 강조 통제 id 집합."""
+    parts = []
+    if size in SIZE_NOTE:
+        parts.append(f"<b style='color:{NAVY}'>기업 규모 · {size}</b> — {SIZE_NOTE[size]}")
+    if sourcing in SRC_NOTE:
+        parts.append(f"<b style='color:{NAVY}'>모델 조달 · {sourcing}</b> — {SRC_NOTE[sourcing]}")
+    html = (
+        f"<div style='background:#F2F4F8;border:1px solid #D9DEE5;border-radius:8px;"
+        f"padding:11px 14px;margin-bottom:12px;font-size:0.82rem;color:{SLATE};line-height:1.55'>"
+        f"<div style='font-weight:800;color:{NAVY};margin-bottom:4px'>🧭 조합 맥락 진단</div>"
+        f"{'<br><br>'.join(parts)}"
+        f"<div style='font-size:0.74rem;color:{GREY};margin-top:6px'>※ 규모는 복잡성의 지표일 뿐 — "
+        f"소규모도 복잡할 수 있음(감사기준서 315 문단6).</div></div>"
+    )
+    emph = set(SIZE_EMPH.get(size, set())) | set(SRC_EMPH.get(sourcing, set()))
+    return html, emph
+
+
+def render_card(card, emphasis=frozenset()) -> None:
     label, lcolor = layer_meta(card.layer)
     with st.container(border=True):
         badges = badge(card.control_id, GREY) + badge(label, lcolor)
@@ -161,6 +194,8 @@ def render_card(card) -> None:
         _atype = getattr(card, "activity_type", None)
         if _atype:
             badges += badge(f"유형 · {_atype}", "#0F766E")
+        if card.control_id in emphasis:
+            badges += badge("★ 이 조합 중요", "#B45309")
         st.markdown(
             f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
             f"<span style='font-size:1.02rem;font-weight:800;color:{NAVY};margin-right:6px'>"
@@ -362,6 +397,9 @@ if output is not None:
                        f"{f' / 층1 {len(l1)}' if l1 else ''}. "
                        "판정이 아니라 '이 프로필이면 이런 통제가 필요하다'는 설계 권고입니다. 근거 미검증 항목은 '원문 대조 전' 배지로 표시됩니다.")
 
+            _banner, _emph = combo_context(ctx.get("size", ""), ctx.get("sourcing", ""))
+            st.markdown(_banner, unsafe_allow_html=True)
+
             st.markdown(
                 f"<div style='background:#F7F8FA;border:1px solid #E2E6EB;border-radius:8px;"
                 f"padding:10px 14px;margin-bottom:12px;font-size:0.86rem;color:{SLATE};line-height:1.55'>"
@@ -376,7 +414,7 @@ if output is not None:
                 "모델·프롬프트·학습데이터·비결정성, 툴셋·접근권한 제한, 전수·상시 모니터링 통제. AI를 신뢰 가능하게 만드는 기반.",
                 ORANGE), unsafe_allow_html=True)
             for c in l2:
-                render_card(c)
+                render_card(c, _emph)
             if not l2:
                 st.info("이 조합에서 수용된 층2 통제가 없습니다. '사람 검토 필요' 탭을 확인하세요.")
 
@@ -390,7 +428,7 @@ if output is not None:
                 "회계 계정별 통제. 층 2가 확보되었다는 전제 위에서만 유효.",
                 NAVY), unsafe_allow_html=True)
             for c in l3:
-                render_card(c)
+                render_card(c, _emph)
             if not l3:
                 st.info("이 조합에서 수용된 층3 통제가 없습니다.")
 
