@@ -158,8 +158,9 @@ def render_card(card) -> None:
         badges = badge(card.control_id, GREY) + badge(label, lcolor)
         if card.forced:
             badges += badge("🔒 강제포함", SLATE)
-        if card.activity_type:
-            badges += badge(f"유형 · {card.activity_type}", "#0F766E")
+        _atype = getattr(card, "activity_type", None)
+        if _atype:
+            badges += badge(f"유형 · {_atype}", "#0F766E")
         st.markdown(
             f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
             f"<span style='font-size:1.02rem;font-weight:800;color:{NAVY};margin-right:6px'>"
@@ -432,7 +433,7 @@ if output is not None:
                         f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'>"
                         f"<span style='font-weight:800;color:{NAVY};margin-right:6px'>{card.name}</span>"
                         f"{badge(card.control_id, GREY)}{badge(label, lcolor)}"
-                        f"{badge('유형 · '+card.activity_type, '#0F766E') if card.activity_type else ''}"
+                        f"{badge('유형 · '+getattr(card,'activity_type',None), '#0F766E') if getattr(card,'activity_type',None) else ''}"
                         f"{badge(f'신뢰도 {card.confidence:.2f}', '#EEF0F3', SLATE)}</div>",
                         unsafe_allow_html=True,
                     )
