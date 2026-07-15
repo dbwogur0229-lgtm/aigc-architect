@@ -299,12 +299,24 @@ with right:
     st.markdown(f"<div style='font-weight:800;color:{NAVY};font-size:1.05rem;margin-top:6px'>"
                 f"③ AI 개입 프로세스 선택</div>", unsafe_allow_html=True)
     st.caption("산업에 따라 목록이 실제로 달라집니다. ★=유의적 추정 · '해당 없음'은 계정 부존재로 제외됩니다.")
+    st.markdown(
+        f"<div style='background:#F7F8FA;border:1px solid #E2E6EB;border-radius:8px;"
+        f"padding:9px 12px;margin:4px 0 8px 0;font-size:0.78rem;color:{SLATE};line-height:1.55'>"
+        f"<b style='color:{ORANGE}'>🔬 DEEP</b> — 근거 조항 원문 대조·감사인 관점까지 완비한 프로세스. "
+        f"설계안이 신뢰도 0.85로 <b>수용</b>됩니다.&nbsp;&nbsp;"
+        f"<b style='color:{GREY}'>◻ OUTLINE</b> — 뼈대 수준 프로세스. 신뢰도 0.50으로 "
+        f"자동으로 <b>'사람 검토 필요'</b>에 격리됩니다 — 덜 검증된 것은 덜 검증됐다고 표시하는 설계입니다."
+        f"</div>", unsafe_allow_html=True)
+    _depths = {pid: pd.get("depth", "outline") for pid, pd in rb.ledger_processes().items()}
     selected: list[str] = []
     for p in procs:
         default = p.significance in ("critical", "significant")
         star = " ★" if p.significance == "critical" else ""
-        checked = st.checkbox(f"{p.name}{star}", value=default,
-                              key=f"proc_{p.process_id}", help=p.rationale)
+        _d = _depths.get(p.process_id)
+        _badge = " 🔬" if _d == "deep" else ""
+        checked = st.checkbox(f"{p.name}{star}{_badge}", value=default,
+                              key=f"proc_{p.process_id}",
+                              help=p.rationale + (f"  [{'DEEP — 원문 대조 완비' if _d == 'deep' else 'OUTLINE — 뼈대, 사람 검토 격리' if _d else '통제 원장 미수록'}]"))
         if checked:
             selected.append(p.process_id)
             if p.significance == "low":
