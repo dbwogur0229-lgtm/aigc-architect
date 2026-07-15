@@ -159,9 +159,9 @@ SIZE_NOTE = {
 }
 SIZE_EMPH = {"대기업": {"aipc_07"}}
 SRC_NOTE = {
-    "외부 API": "<b>서비스조직 이용에 해당(감사기준서 402)</b>: SOC <b>유형2 보고서</b>(설계+운영효과성)로 공급사 통제 의존 여부를 결정, <b>상호보완적 이용자기업통제</b> 식별, 잔여위험 평가. 모델 내부 검증 불가 → 산출물(<b>IPE</b>) 검증·사이버보안·DLP 강조(315 A174).",
+    "외부 API": "<b>서비스조직 이용에 해당(감사기준서 402)</b>: <b>유형2 보고서</b>(설계+운영효과성, 실무: <b>SOC 1</b>·정보보호는 <b>SOC 2</b>)로 공급사 통제 의존 여부를 결정, <b>상호보완적 이용자기업통제</b> 식별, 잔여위험 평가. 모델 내부 검증 불가 → 산출물(<b>IPE</b>) 검증·사이버보안·DLP 강조(315 A174).",
     "자체개발": "내부 개발·운영: 시스템 개발·변경관리(315 보론6-2b), <b>학습데이터 거버넌스</b>(ecl_06), 모델 변경관리(aipc_05)가 내부 책임. 서비스조직(402) 미적용.",
-    "벤더 모델": "구매 소프트웨어 성격(315 A126): <b>변경관리·벤더 버전관리</b>(aipc_05) 중심. 벤더가 클라우드로 운영하면 서비스조직(402) 적용.",
+    "벤더 모델": "구매 소프트웨어 성격(315 A126): <b>변경관리·벤더 버전관리</b>(aipc_05) 중심. 벤더가 클라우드로 운영하면 서비스조직(402) 적용 — SOC 보고서 요구.",
 }
 SRC_EMPH = {"외부 API": {"aipc_03", "aipc_02"}, "자체개발": {"ecl_06", "aipc_05"}, "벤더 모델": {"aipc_05"}}
 
@@ -369,10 +369,22 @@ if output is not None:
         with tabs[0]:
             g = output.gate
             (st.success if g.passed else st.warning)(g.message)
+            _res_groups: dict[str, list] = {}
             for chk in rb.itgc_gate()["checks"]:
-                ok = chk["id"] not in g.failed_checks
-                st.write(f"{'✅' if ok else '❌'} {chk['question']}")
-                st.caption(f"   → {chk['why_prerequisite']}")
+                _res_groups.setdefault(chk.get("category", "기타"), []).append(chk)
+            for _cat, _checks in _res_groups.items():
+                _n_ok = sum(1 for c in _checks if c["id"] not in g.failed_checks)
+                _all_ok = _n_ok == len(_checks)
+                st.markdown(
+                    f"<div style='font-size:0.82rem;font-weight:700;"
+                    f"color:{ORANGE if _all_ok else '#B42318'};margin:10px 0 2px 0'>"
+                    f"{_cat} · {_n_ok}/{len(_checks)} 충족</div>",
+                    unsafe_allow_html=True,
+                )
+                for chk in _checks:
+                    ok = chk["id"] not in g.failed_checks
+                    st.write(f"{'✅' if ok else '❌'} {chk['question']}")
+                    st.caption(f"   → {chk['why_prerequisite']}")
 
         # --- 어서션 리스크 맵 ---
         with tabs[1]:
@@ -440,7 +452,9 @@ if output is not None:
                 f"<div style='font-weight:800;color:{ORANGE};margin-bottom:4px'>"
                 f"⚡ 벤치마킹 논리의 붕괴</div>"
                 f"AI 기반 자동통제는 <b>비결정성</b>(같은 자료를 넣어도 결과가 달라질 수 있는 성질)으로 인해 기존 IT 환경의 "
-                f"<b>‘벤치마킹(Benchmarking, Sample=1) 논리’</b>가 적용되지 않습니다. 따라서 감사인은 "
+                f"<b>‘벤치마킹(Benchmarking, Sample=1) 논리’</b>가 적용되지 않습니다. "
+                f"나아가 AI 오류는 개별 건이 아니라 <b>모집단 전체로 동시에 확산(증폭성)</b>되므로 "
+                f"표본 축소가 아닌 <b>전수 검증·상시 모니터링</b>(aipc_07)이 대안이 됩니다. 따라서 감사인은 "
                 f"<b>AIGC(층 2)</b>의 운영 유효성을 먼저 테스트한 후, 예외 사항에 대한 "
                 f"<b>경영진 검토통제(MRC)</b>에 <b>실증적 성격의 테스트</b>를 결합하여 접근해야 합니다."
                 f"</div>",

@@ -49,6 +49,10 @@ itgc_gate:
       category: "④ AI 고유 선결 · 프로젝트"
       question: "AI 기본법(2026.1 시행) 적용 여부(고위험 AI 분류 등)를 검토하였는가?"
       why_prerequisite: "규제 적용 대상 여부가 AI 통제의 설계 강도를 좌우"
+    - id: gate_ai_inventory
+      category: "④ AI 고유 선결 · 프로젝트"
+      question: "전사 AI 사용 인벤토리를 관리하고 있는가? (부서별 미승인 사용, 이른바 Shadow AI 포함)"
+      why_prerequisite: "존재를 모르는 AI는 통제할 수 없다 — 인벤토리 없이는 통제 범위 자체가 정의되지 않는다 (실무: Shadow AI 확산이 대표적 AI 거버넌스 실패 요인)"
   fail_message: |
     ITGC 미비 상태에서는 AI 통제(AIGC)의 유효성이 성립하지 않습니다.
     선결 과제는 ITGC 구축이며, 본 도구의 통제 설계는 ITGC가 유효함을 전제합니다.
@@ -172,7 +176,7 @@ processes:
           - source: "내부회계관리제도 설계·운영 개념체계 (원칙 16·17 · 상시적 모니터링)"
             paragraph: "TBD"
             verified: false
-        auditor_view: "전수 검증은 완전성·객관성을 높이지만, 전수의 근거가 되는 데이터(IPE)의 완전성이 담보되지 않으면 '전수'라는 외형만 남는다."
+        auditor_view: "전수 검증은 완전성·객관성을 높이지만, 전수의 근거가 되는 데이터(IPE)의 완전성이 담보되지 않으면 '전수'라는 외형만 남는다. 한편 AI 오류는 개별 건에 머물지 않고 모집단 전체로 동시에 확산(증폭성)되므로, 표본 논리의 실질적 대안은 전수·상시 모니터링이다."
 
       - id: aipc_08
         layer: 2
