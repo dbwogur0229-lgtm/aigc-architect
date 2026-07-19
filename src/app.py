@@ -420,6 +420,20 @@ if output is not None:
             l2 = [c for c in acc if c.layer == 2]
             l3 = [c for c in acc if c.layer == 3]
             l1 = [c for c in acc if c.layer == 1]
+            _promoted = [c for c in output.harness.quarantined
+                         if st.session_state.get(f"promote_{c.control_id}")]
+            _xlsx = xl.build_excel(
+                output, ctx, rb.itgc_gate()["checks"],
+                {c.control_id for c in _promoted},
+            )
+            st.download_button(
+                "📥 엑셀 다운로드 — 감사조서형 (전제조건·리스크맵·통제설계안·사람검토)",
+                data=_xlsx,
+                file_name=f"AIGC_통제설계안_{ctx.get('industry','')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+            st.caption("'사람 검토 필요' 탭에서 확정한 통제는 '사람 검토 후 확정' 경로로 표시되어 엑셀에 포함됩니다.")
             st.caption(f"수용된 통제 {len(acc)}개 · 층2(AIGC) {len(l2)} / 층3(프로세스) {len(l3)}"
                        f"{f' / 층1 {len(l1)}' if l1 else ''}. "
                        "판정이 아니라 '이 프로필이면 이런 통제가 필요하다'는 설계 권고입니다. 근거 미검증 항목은 '원문 대조 전' 배지로 표시됩니다.")
@@ -459,8 +473,6 @@ if output is not None:
             if not l3:
                 st.info("이 조합에서 수용된 층3 통제가 없습니다.")
 
-            _promoted = [c for c in output.harness.quarantined
-                         if st.session_state.get(f"promote_{c.control_id}")]
             if _promoted:
                 st.markdown(section_bar(
                     "✅ 사람 검토 후 확정된 통제",
@@ -469,19 +481,7 @@ if output is not None:
                 for c in _promoted:
                     render_card(c, _emph)
 
-            st.divider()
-            _xlsx = xl.build_excel(
-                output, ctx, rb.itgc_gate()["checks"],
-                {c.control_id for c in _promoted},
-            )
-            st.download_button(
-                "📥 엑셀 다운로드 — 감사조서형 (전제조건·리스크맵·통제설계안·사람검토)",
-                data=_xlsx,
-                file_name=f"AIGC_통제설계안_{ctx.get('industry','')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
-            st.caption("산출물을 고객 전달·감사인 검토용 문서로 제공 — '사람 검토 필요' 탭에서 확정한 통제는 '사람 검토 후 확정' 경로로 표시되어 포함됩니다.")
+
 
         # --- 감사인 관점 (벤치마킹 붕괴 콜아웃) ---
         with tabs[3]:
