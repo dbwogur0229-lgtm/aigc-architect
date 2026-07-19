@@ -376,8 +376,8 @@ if output is not None:
             st.info(rb.itgc_gate()["fail_rationale"])
     else:
         tabs = st.tabs([
-            "✅ 전제 조건", "🗺️ 경영진주장 리스크 맵", "🎛️ 통제 설계안",
-            "👓 감사인 관점", "⚠️ 사람 검토 필요", "🔍 실행 로그",
+            "✅ 전제 조건", "🗺️ 경영진주장 리스크 맵", "⚠️ 사람 검토 필요",
+            "🎛️ 통제 설계안", "👓 감사인 관점", "🔍 실행 로그",
         ])
 
         # --- 선결 확인 ---
@@ -415,7 +415,7 @@ if output is not None:
                 st.caption(f"   영향받는 경영진주장: {plainify(r.assertion_impact)}")
 
         # --- 통제 설계안 (3층 위계) ---
-        with tabs[2]:
+        with tabs[3]:
             acc = output.harness.accepted
             l2 = [c for c in acc if c.layer == 2]
             l3 = [c for c in acc if c.layer == 3]
@@ -425,6 +425,13 @@ if output is not None:
             _xlsx = xl.build_excel(
                 output, ctx, rb.itgc_gate()["checks"],
                 {c.control_id for c in _promoted},
+            )
+            st.markdown(
+                "<style>div[data-testid='stDownloadButton'] button{"
+                "background:#1A7F37;color:#fff;border:1px solid #1A7F37;font-weight:700}"
+                "div[data-testid='stDownloadButton'] button:hover{"
+                "background:#136329;border-color:#136329;color:#fff}</style>",
+                unsafe_allow_html=True,
             )
             st.download_button(
                 "📥 엑셀 다운로드 — 감사조서형 (전제조건·리스크맵·통제설계안·사람검토)",
@@ -484,7 +491,7 @@ if output is not None:
 
 
         # --- 감사인 관점 (벤치마킹 붕괴 콜아웃) ---
-        with tabs[3]:
+        with tabs[4]:
             st.markdown(
                 f"<div style='border-left:6px solid {ORANGE};background:#FBEEE6;"
                 f"padding:14px 18px;border-radius:0 8px 8px 0;color:{SLATE};line-height:1.65'>"
@@ -513,10 +520,11 @@ if output is not None:
             st.markdown(show(output.auditor_view))
 
         # --- 사람 검토 필요 (격리) ---
-        with tabs[4]:
+        with tabs[2]:
             q = output.harness.quarantined
             st.caption("에이전트가 확신하지 못해 확정하지 않고 격리한 항목 (Human-in-the-loop). "
-                       "대개 골격(outline) 단계로 원문 대조·상술이 필요합니다.")
+                       "대개 골격(outline) 단계로 원문 대조·상술이 필요합니다. "
+                       "여기서 검토·확정한 통제는 다음 탭 '통제 설계안'과 엑셀에 포함됩니다.")
             for card in q:
                 label, lcolor = layer_meta(card.layer)
                 with st.container(border=True):
