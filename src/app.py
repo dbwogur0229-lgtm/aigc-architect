@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import streamlit as st
 
 import llm
+import export as xl
 import rulebook as rb
 import skills
 from agent import AgentInputs, run_agent
@@ -346,6 +347,8 @@ if run:
         elif kind == "done":
             output = payload
     status.update(label="에이전트 실행 완료", state="complete", expanded=False)
+    for _k in [k for k in st.session_state if k.startswith("promote_")]:
+        del st.session_state[_k]
     st.session_state["output"] = output
     st.session_state["ctx"] = {"industry": industries[industry]["name"],
                                "size": company_size, "sourcing": model_sourcing}
@@ -456,6 +459,30 @@ if output is not None:
             if not l3:
                 st.info("이 조합에서 수용된 층3 통제가 없습니다.")
 
+            _promoted = [c for c in output.harness.quarantined
+                         if st.session_state.get(f"promote_{c.control_id}")]
+            if _promoted:
+                st.markdown(section_bar(
+                    "✅ 사람 검토 후 확정된 통제",
+                    "'사람 검토 필요' 탭에서 검토를 마치고 확정한 통제. 격리 → 검토 → 확정의 HITL 경로를 거쳤습니다.",
+                    "#1A7F37"), unsafe_allow_html=True)
+                for c in _promoted:
+                    render_card(c, _emph)
+
+            st.divider()
+            _xlsx = xl.build_excel(
+                output, ctx, rb.itgc_gate()["checks"],
+                {c.control_id for c in _promoted},
+            )
+            st.download_button(
+                "📥 엑셀 다운로드 — 감사조서형 (전제조건·리스크맵·통제설계안·사람검토)",
+                data=_xlsx,
+                file_name=f"AIGC_통제설계안_{ctx.get('industry','')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+            st.caption("산출물을 고객 전달·감사인 검토용 문서로 제공 — '사람 검토 필요' 탭에서 확정한 통제는 '사람 검토 후 확정' 경로로 표시되어 포함됩니다.")
+
         # --- 감사인 관점 (벤치마킹 붕괴 콜아웃) ---
         with tabs[3]:
             st.markdown(
@@ -502,6 +529,11 @@ if output is not None:
                         unsafe_allow_html=True,
                     )
                     st.markdown(show(card.implementation))
+                    st.checkbox(
+                        "✅ 검토 완료 — 설계안으로 확정 (엑셀 '통제설계안' 시트에 포함)",
+                        key=f"promote_{card.control_id}",
+                        help="사람 검토(HITL)를 마친 통제만 확정하세요. 확정 시 통제 설계안 탭과 엑셀에 '사람 검토 후 확정'으로 표시됩니다.",
+                    )
                     st.caption("📚 근거 " + ", ".join(e.source for e in card.evidences) + " — 검토·상술 후 확정 대상")
             if not q:
                 st.success("격리된 항목이 없습니다.")
